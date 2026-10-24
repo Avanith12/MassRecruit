@@ -1,1 +1,2 @@
-# MassRecruit
+MassRecruit — Connecting Students with Research Opportunities
+MassRecruit is a platform connecting students and researchers across Massachusetts universities, starting with UMass Boston. Students can discover research opportunities, compare compensation, understand how their data will be used, and sign up for studies with calendar integration. Researchers can publish studies, manage participants, and generate recruitment flyers with QR codes. AI helps simplify study descriptions and match students with relevant opportunities, making research participation more accessible and transparent.
