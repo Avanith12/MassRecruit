@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="pictures/image.png" alt="MassRecruit landing page: Your campus. Real research. Real rewards." width="720">
+</p>
+
 # MassRecruit
 
 **Your campus. Real research. Real rewards.**
