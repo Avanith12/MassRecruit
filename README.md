@@ -138,11 +138,11 @@ The `/.kiro` folder is part of the project and must stay in the repository.
 
 ## Team
 
-| Name | Role |
-|---|---|
-| Jiehyun Kim | Developer |
-| Ana Fahlboeck | Developer |
-| Avanith Kanamarlapudi | Developer and team representative |
+| Name | Role | Email |
+|---|---|---|
+| Jiehyun Kim | Developer | JieHyun.Kim001@umb.edu |
+| Ana Fahlboeck | Developer | Ana.Fahlboeck@umb.edu |
+| Avanith Kanamarlapudi | Developer and team representative | a.kanamarlapudi001@umb.edu |
 
 ---
 
