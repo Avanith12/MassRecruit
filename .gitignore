@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# env (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# local databases
+prisma/*.db
+prisma/*.db-journal
+
+# misc
+.DS_Store
+coverage/
+dev-server.log
+
+# NOTE: .kiro/ must stay committed (Hackachusetts rules) — do not add it here.
+test-results/
+playwright-report/

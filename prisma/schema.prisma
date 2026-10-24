@@ -1,0 +1,128 @@
+// MassRecruit data model — eight entities (see README "Data model").
+// SQLite in dev; swap provider/url for Turso or Postgres in production.
+// String columns are used instead of enums for portability; allowed values are
+// enforced in lib/rules.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  emailDomain String
+  city        String
+  departments Department[]
+  users       User[]
+}
+
+model Department {
+  id       String @id @default(cuid())
+  name     String
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id])
+  users    User[]
+
+  @@unique([schoolId, name])
+}
+
+model User {
+  id           String       @id @default(cuid())
+  username     String       @unique
+  passwordHash String
+  name         String
+  email        String       @unique
+  role         String // STUDENT | RESEARCHER | ADMIN
+  verified     Boolean      @default(false) // researchers need admin approval
+  phone        String?
+  schoolId     String?
+  school       School?      @relation(fields: [schoolId], references: [id])
+  departmentId String?
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  createdAt    DateTime     @default(now())
+  studies      Study[]
+  applications Application[]
+}
+
+model Study {
+  id                  String             @id @default(cuid())
+  nctId               String?
+  name                String
+  phase               String // EARLY_PHASE1 | PHASE1..4 | NA
+  condition           String
+  city                String
+  status              String // RECRUITING | CLOSED
+  irbId               String
+  compensationType    String // CASH | GIFT_CARD | OTHER
+  compensationDetails String
+  description         String
+  eligibility         String
+  minAge              Int                @default(18)
+  researcherId        String
+  researcher          User               @relation(fields: [researcherId], references: [id])
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  consentForm         ConsentForm?
+  slots               AvailabilitySlot[]
+  applications        Application[]
+
+  @@index([status])
+  @@index([city])
+}
+
+model ConsentForm {
+  id        String   @id @default(cuid())
+  studyId   String   @unique
+  study     Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  fileUrl   String?
+  text      String
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+}
+
+model AvailabilitySlot {
+  id        String   @id @default(cuid())
+  studyId   String
+  study     Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  startTime DateTime
+  endTime   DateTime
+  isBooked  Boolean  @default(false)
+  booking   Booking?
+
+  @@index([studyId, startTime])
+}
+
+model Application {
+  id                   String   @id @default(cuid())
+  studyId              String
+  study                Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  participantId        String
+  participant          User     @relation(fields: [participantId], references: [id])
+  name                 String
+  email                String
+  dateOfBirth          DateTime
+  consentSigned        Boolean
+  consentSignedName    String
+  consentVersionSigned Int
+  consentSignedAt      DateTime
+  status               String   @default("PENDING") // PENDING | ACCEPTED | REJECTED
+  submittedAt          DateTime @default(now())
+  booking              Booking?
+
+  @@unique([studyId, participantId])
+}
+
+model Booking {
+  id             String           @id @default(cuid())
+  slotId         String           @unique
+  slot           AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  applicationId  String           @unique
+  application    Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reminderSentAt DateTime?
+  createdAt      DateTime         @default(now())
+}

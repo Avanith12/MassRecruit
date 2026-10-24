@@ -135,18 +135,33 @@ Full field-level definitions are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
 ```
 .
 ├── .kiro/                     # Kiro specs, steering, hooks (REQUIRED — do not gitignore)
-├── docs/
-│   └── ARCHITECTURE.md        # architecture, data model, routes, roadmap
-├── data/
-│   └── massrecruit_mock_data.csv   # generated mock dataset (20 MA universities)
-├── scripts/
-│   └── generate_mock_csv.py   # mock-data generator
-├── SUBMISSION.md              # hackathon submission write-up
+├── app/
+│   ├── page.tsx               # public browse + search/filter (/)
+│   ├── studies/[id]/          # study detail + apply/consent form
+│   ├── login/ register/       # single sign-in w/ role choice; .edu sign-up
+│   ├── student/               # applications, status, slot booking
+│   ├── researcher/            # dashboard, new study, manage study (applicants, slots, edit)
+│   ├── admin/                 # researcher verification
+│   ├── api/cron/reminders/    # daily reminder job (Bearer CRON_SECRET)
+│   └── actions.ts             # server actions
+├── components/                # ActionForm + UI primitives
+├── lib/
+│   ├── rules.ts               # pure business rules (age, .edu, consent, slots, reminders, TZ)
+│   ├── services.ts            # all DB business logic (auth, studies, applications, booking)
+│   ├── session.ts             # signed-cookie sessions (jose)
+│   ├── email.ts               # Resend, or console/outbox fallback
+│   └── csv.ts db.ts
+├── prisma/
+│   ├── schema.prisma          # 8 entities
+│   ├── migrations/
+│   └── seed.ts                # CSV → normalized tables + demo accounts
+├── tests/
+│   ├── unit/                  # Vitest + fast-check (rules + DB-backed service tests)
+│   └── e2e/                   # Playwright browser tests
+├── data/massrecruit_mock_data.csv
+├── SUBMISSION.md
 └── README.md
 ```
-
-> _As the Next.js app is implemented, `app/`, `prisma/`, `lib/`, and `components/`
-> directories will be added._
 
 ---
 
@@ -167,10 +182,10 @@ cd MassRecruit
 # 2. Install dependencies
 npm install
 
-# 3. Configure environment (see below)
-cp .env.example .env.local   # then edit values
+# 3. Configure environment (see below) — Prisma reads .env
+cp .env.example .env         # then set AUTH_SECRET (e.g. `openssl rand -hex 32`) and CRON_SECRET
 
-# 4. Set up the database (SQLite locally)
+# 4. Set up the database (SQLite locally) and load the mock data
 npx prisma migrate dev
 npx prisma db seed
 
@@ -179,14 +194,46 @@ npm run dev
 # open http://localhost:3000
 ```
 
-> The exact commands finalize as the app scaffolding lands; `docs/ARCHITECTURE.md`
-> tracks the current build state.
+### Demo accounts (created by the seed)
+
+All use password `password123`. On the sign-in page, pick the matching role.
+
+| Username | Role | Notes |
+|---|---|---|
+| `student` | Student | apply, sign consent, book slots |
+| `researcher` | Researcher (verified) | owns 2 demo studies with open slots |
+| `pending` | Researcher (unverified) | sees "awaiting verification" until approved |
+| `admin` | Admin | approve/revoke researchers |
+
+Every CSV user can also sign in with the same password (username = email local part).
+
+Without `RESEND_API_KEY`, emails (acceptance, booking confirmation, reminders, approval)
+are printed to the dev-server console.
+
+Trigger the reminder job manually:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/reminders
+# → {"checked":N,"sent":N,"failed":0}
+```
+
+### Tests
+
+```bash
+npm test            # Vitest: 51 unit, property-based (fast-check) and DB integration tests
+npm run test:e2e    # Playwright: 8 browser tests on a production build (port 3100)
+npm run typecheck
+```
+
+Tests use their own SQLite files (`prisma/test.db`, `prisma/e2e.db`), so they never touch
+`dev.db`. E2E runs on the system Chrome by default; to use Playwright's bundled
+Chromium, run `npx playwright install chromium` and set `PW_CHANNEL=""`.
 
 ---
 
 ## Environment variables
 
-Create `.env.local` (never commit secrets):
+Create `.env` from `.env.example` (gitignored — never commit secrets):
 
 ```bash
 # Database (local dev uses SQLite)
@@ -263,8 +310,11 @@ contains our specs, steering docs, and hooks.
 - **Steering docs:** _[how steering encoded stack choices and rules like "researchers
   gated behind admin verification"]_
 - **MCP:** _[servers/tools connected and what they enabled]_
-- **Property-based testing:** _[invariants tested — e.g., no double-booked slot, age
-  eligibility, consent-version recording]_
+- **Property-based testing:** fast-check invariants in `tests/unit/` — no slot or
+  application is ever double-booked under random concurrent booking attempts; an
+  application is accepted ⇔ age ≥ the study minimum; every appointment gets exactly one
+  reminder day under a daily cron; `.edu` filtering rejects all other domains; Boston
+  time-zone conversion round-trips across DST; the CSV parser round-trips arbitrary fields.
 - **Kiro Powers:** _[e.g., github-cli, playwright/agent-browser]_
 
 A fuller write-up is in [`SUBMISSION.md`](SUBMISSION.md).
