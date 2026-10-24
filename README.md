@@ -8,6 +8,8 @@ Students who want to join a study should not have to hunt through paper flyers a
 
 **Live demo:** https://massrecruit.vercel.app/
 
+**Demo video:** https://youtu.be/aCxV3wdPmIM
+
 ---
 
 ## Try the live demo
@@ -82,7 +84,7 @@ Student                         Verified researcher              Admin
 | Hosting | https://massrecruit.vercel.app/ on Vercel |
 | Tests | Vitest, fast-check, and Playwright |
 
-Field-level data model and routes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Hackathon write-up: [`SUBMISSION.md`](SUBMISSION.md).
+Field-level data model and routes: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -131,8 +133,6 @@ The `/.kiro` folder is part of the project and must stay in the repository.
 - **Kiro CLI** wrote the spec, generated the app, and ran typecheck, tests, and the production build.
 - Specs, steering docs, and hooks live in [`.kiro/`](.kiro/). Property-based tests caught a real search bug: a school name with a doubled space failed to match.
 - Kiro Web, Kiro Crew, MCP, and Kiro Powers were not used.
-
-The longer account is in [`SUBMISSION.md`](SUBMISSION.md).
 
 ---
 
