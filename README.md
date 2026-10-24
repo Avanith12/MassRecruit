@@ -115,7 +115,6 @@ npm run db:seed
 npm run dev
 ```
 
-Open http://localhost:3000. On your laptop the four demo usernames use the password `password123`. That password works only for a local database.
 
 The mock studies are already in [`data/massrecruit_mock_data.csv`](data/massrecruit_mock_data.csv): 20 Massachusetts universities, 200 study rows. `npm run db:seed` loads them.
 
