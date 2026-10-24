@@ -127,7 +127,6 @@ Copy every variable you need from [`.env.example`](.env.example). Never commit `
 
 ## Built with Kiro
 
-The `/.kiro` folder is part of the project and must stay in the repository.
 
 - **Kiro IDE** was used to brainstorm the problem, the path from finding a study to the reminder, and the rules that do not bend: `.edu` only, researchers approved by an admin, and no double-booking.
 - **Kiro CLI** wrote the spec, generated the app, and ran typecheck, tests, and the production build.
