@@ -1,13 +1,14 @@
 import { defineConfig } from "@playwright/test";
 
 const PORT = 3100;
-// Isolated DB for E2E (prisma/e2e.db) so dev data is never touched.
+// Isolated throwaway Postgres for E2E (started by scripts/e2e-server.mjs).
 const env = {
-  DATABASE_URL: "file:./e2e.db",
   CRON_SECRET: "e2e-cron-secret",
   ADMIN_EMAILS: "admin@umb.edu",
   RESEND_API_KEY: "",
-  PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION: "yes", // allows --force-reset of the throwaway e2e DB
+  BLOB_READ_WRITE_TOKEN: "",
+  UPLOAD_DIR: "./test-results/uploads", // throwaway local storage for consent PDFs
+  E2E_PORT: String(PORT),
 };
 
 export default defineConfig({
@@ -23,13 +24,8 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    // Reset + seed the e2e DB, build, then serve the production bundle.
-    command: [
-      "npx prisma db push --force-reset --skip-generate",
-      "npx tsx prisma/seed.ts",
-      "npx next build",
-      `npx next start -p ${PORT}`,
-    ].join(" && "),
+    // Throwaway Postgres → schema → seed → production build → next start.
+    command: "node scripts/e2e-server.mjs",
     url: `http://localhost:${PORT}`,
     timeout: 240_000,
     reuseExistingServer: false,

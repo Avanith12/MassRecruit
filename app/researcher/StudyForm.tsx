@@ -7,7 +7,7 @@ import { COMPENSATION_TYPES, PHASES, PHASE_LABELS } from "@/lib/rules";
 export type StudyDefaults = {
   name: string; condition: string; city: string; phase: string; status: string; irbId: string;
   compensationType: string; compensationDetails: string; description: string; eligibility: string;
-  minAge: number; consentText: string; consentVersion?: number;
+  minAge: number; consentText: string; consentVersion?: number; consentPdfUrl?: string | null;
 };
 
 const EMPTY: StudyDefaults = {
@@ -66,6 +66,19 @@ export function StudyForm({
       >
         <Textarea name="consentText" required rows={6} defaultValue={d.consentText} />
       </Field>
+      <div className="space-y-2">
+        <Field label="Consent PDF (optional)" hint="PDF, up to 5 MB. Uploading a new file also creates a new consent version.">
+          <Input name="consentPdf" type="file" accept="application/pdf,.pdf" />
+        </Field>
+        {d.consentPdfUrl && (
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <a href={d.consentPdfUrl} target="_blank" rel="noreferrer">Current consent PDF</a>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="removeConsentPdf" /> Remove PDF
+            </label>
+          </div>
+        )}
+      </div>
       <Button>{submitLabel}</Button>
     </ActionForm>
   );

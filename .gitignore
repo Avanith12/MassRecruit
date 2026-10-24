@@ -12,7 +12,7 @@ next-env.d.ts
 .env.local
 .env.*.local
 
-# local databases
+# legacy local SQLite files
 prisma/*.db
 prisma/*.db-journal
 
@@ -24,3 +24,9 @@ dev-server.log
 # NOTE: .kiro/ must stay committed (Hackachusetts rules) — do not add it here.
 test-results/
 playwright-report/
+
+# local consent PDF uploads (dev fallback)
+uploads/
+
+# local embedded Postgres data (npm run db:start)
+.pgdata/

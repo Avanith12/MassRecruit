@@ -16,3 +16,71 @@ a {
 a:hover {
   @apply underline;
 }
+
+/* ------------------------------------------------------------------ dark theme
+ * Black background with hot-pink text — the DEFAULT theme (<html class="dark"> is
+ * server-rendered). The toggle switches to the light theme above and remembers it.
+ * Contrast on #000: hotpink #ff69b4 ≈ 7.9:1, deeppink #ff1493 ≈ 5.8:1, pink-300 ≈ 12:1.
+ */
+html.dark {
+  color-scheme: dark;
+  --pink: #ff69b4;        /* body text (CSS "hotpink") */
+  --pink-strong: #ff1493; /* accents, buttons, headings */
+  --pink-muted: #f9a8d4;  /* secondary text */
+  --pink-faint: #e879b9;  /* disabled / past items */
+  --surface: #0b0b0b;
+  --tint: #1f0012;
+  --line: rgb(255 105 180 / 0.35);
+  --icon-fg: #000;
+}
+
+.dark body { background-color: #000; color: var(--pink); }
+.dark a { color: var(--pink); }
+.dark h1, .dark h2 { color: var(--pink-strong); }
+.dark ::placeholder { color: rgb(255 105 180 / 0.6); }
+.dark *:focus-visible { outline: 2px solid var(--pink-strong); outline-offset: 2px; }
+
+/* surfaces */
+.dark .bg-white, .dark .bg-slate-50, .dark .bg-slate-100, .dark .focus\:bg-white:focus,
+.dark .disabled\:bg-slate-100:disabled { background-color: var(--surface); }
+.dark .bg-brand-50, .dark .bg-brand-100, .dark .bg-green-50, .dark .bg-green-100,
+.dark .bg-red-50, .dark .bg-red-100, .dark .bg-amber-50, .dark .bg-amber-100 { background-color: var(--tint); }
+.dark .hover\:bg-slate-50:hover { background-color: #1a1a1a; }
+.dark .has-\[\:checked\]\:bg-brand-50:has(:checked) { background-color: #33001c; }
+
+/* text */
+.dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700, .dark .text-brand-800,
+.dark .text-brand-700, .dark .text-brand-600, .dark .text-green-800, .dark .text-amber-900,
+.dark .text-red-800, .dark .text-red-700 { color: var(--pink); }
+.dark .text-slate-600, .dark .text-slate-500, .dark .text-brand-50 { color: var(--pink-muted); }
+.dark .text-slate-400 { color: var(--pink-faint); }
+
+/* buttons & filled accents: hot pink with black text */
+.dark .bg-brand-600 { background-color: var(--pink-strong); }
+.dark .hover\:bg-brand-700:hover { background-color: #ff4fa8; }
+.dark .bg-red-600 { background-color: #ff2d55; }
+.dark .hover\:bg-red-700:hover { background-color: #ff5c7a; }
+.dark .text-white { color: #000; }
+
+/* borders */
+.dark .border-slate-200, .dark .border-slate-300, .dark .border-brand-100, .dark .border-amber-200,
+.dark .border-amber-300, .dark .hover\:border-slate-300:hover { border-color: var(--line); }
+.dark .border-brand-600, .dark .hover\:border-brand-600:hover,
+.dark .has-\[\:checked\]\:border-brand-600:has(:checked) { border-color: var(--pink-strong); }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(255 105 180 / 0.2); }
+
+/* hero banner on /studies: outlined instead of the blue gradient */
+.dark .hero { background-image: none; background-color: #000; border: 2px solid var(--pink-strong); }
+.dark .hero.text-white { color: var(--pink); }
+
+/* landing */
+.dark .landing-icon { color: var(--pink-strong); }
+.dark .landing-tagline { color: var(--pink-strong); }
+
+/* native form controls without explicit Tailwind bg (search bar, selects) */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .dark select, .dark textarea {
+  background-color: var(--surface);
+  border-color: var(--line);
+  color: var(--pink);
+}
+.dark option { background-color: #000; color: var(--pink); }

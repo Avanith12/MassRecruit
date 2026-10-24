@@ -9,6 +9,8 @@ import {
   parseAdminEmails,
   parseDateOnly,
   parseMinAge,
+  queryTokens,
+  schoolMatchesTerm,
   validatePassword,
   validateSlot,
   validateUsername,
@@ -63,7 +65,9 @@ describe("username / password validation", () => {
   it("password length bounds", () => {
     expect(validatePassword("1234567")).not.toBeNull();
     expect(validatePassword("12345678")).toBeNull();
-    expect(validatePassword("x".repeat(129))).not.toBeNull();
+    expect(validatePassword("x".repeat(72))).toBeNull();
+    expect(validatePassword("x".repeat(73))).not.toBeNull(); // bcrypt's 72-byte limit
+    expect(validatePassword("é".repeat(37))).not.toBeNull(); // 74 bytes in UTF-8
   });
   it("parseAdminEmails trims, lowercases, drops blanks", () => {
     expect(parseAdminEmails(" A@umb.edu, ,b@mit.edu ")).toEqual(["a@umb.edu", "b@mit.edu"]);
@@ -230,6 +234,47 @@ describe("reminder schedule (one day before)", () => {
         },
       ),
     );
+  });
+});
+
+describe("school search matching", () => {
+  const umb = { name: "University of Massachusetts Boston", aliases: "UMass Boston, UMB", emailDomain: "umb.edu" };
+  const mit = { name: "Massachusetts Institute of Technology", aliases: "MIT", emailDomain: "mit.edu" };
+  const smith = { name: "Smith College", aliases: "", emailDomain: "smith.edu" };
+  const bu = { name: "Boston University", aliases: "BU", emailDomain: "bu.edu" };
+  it.each([
+    [umb, "University of Massachusetts Boston", true],
+    [umb, "umass boston", true],
+    [umb, "UMass", true],
+    [umb, "umb", true],
+    [umb, "umb.edu", true],
+    [umb, "@umb.edu", true],
+    [umb, "Massachusetts", true],
+    [umb, "boston", true],
+    [umb, "Boston University", false],
+    [bu, "Boston University", true],
+    [bu, "bu", true],
+    [mit, "MIT", true],
+    [smith, "mit", false], // word-start only: "Smith" must not match "mit"
+    [smith, "smith", true],
+    [umb, "", false],
+    [umb, "(", false], // regex metacharacters are escaped
+  ])("%o ~ %s → %s", (school, term, ok) => expect(schoolMatchesTerm(school, term)).toBe(ok));
+
+  it("property: never throws and a school always matches its own name", () => {
+    fc.assert(
+      fc.property(fc.string({ maxLength: 30 }), fc.stringMatching(/^[A-Za-z0-9][A-Za-z0-9 .,&'()-]{0,29}$/), (term, name) => {
+        const s = { name, aliases: "", emailDomain: "x.edu" };
+        expect(() => schoolMatchesTerm(s, term)).not.toThrow();
+        expect(schoolMatchesTerm(s, name)).toBe(true);
+      }),
+    );
+  });
+
+  it("queryTokens drops stopwords unless nothing is left", () => {
+    expect(queryTokens("  sleep   at   UMass ")).toEqual(["sleep", "UMass"]);
+    expect(queryTokens("of the")).toEqual(["of", "the"]);
+    expect(queryTokens("")).toEqual([]);
   });
 });
 

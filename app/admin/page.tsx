@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
-import { formatDate } from "@/lib/rules";
+import { formatDay } from "@/lib/rules";
 import { ActionForm } from "@/components/ActionForm";
 import { Button, Card } from "@/components/ui";
 import { verifyAction } from "@/app/actions";
@@ -25,7 +26,7 @@ export default async function AdminPage() {
         </p>
         <p className="text-xs text-slate-600">
           {r.email} · {r.school?.name ?? "No school"}
-          {r.department && ` · ${r.department.name}`} · joined {formatDate(r.createdAt)} · {r._count.studies} studies
+          {r.department && ` · ${r.department.name}`} · joined {formatDay(r.createdAt)} · {r._count.studies} studies
         </p>
       </div>
       <ActionForm action={verifyAction} aria-label={`${r.verified ? "Revoke" : "Approve"} ${r.username}`}
@@ -41,7 +42,10 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Admin · Researcher verification</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">Admin · Researcher verification</h1>
+        <Link href="/admin/emails">View email log →</Link>
+      </div>
       <Card>
         <h2 className="text-lg font-semibold">Awaiting verification ({pending.length})</h2>
         {pending.length === 0 ? (

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { publicStudyWhere } from "@/lib/services";
-import { PHASE_LABELS, formatDate } from "@/lib/rules";
+import { PHASE_LABELS, formatDay, zonedDateKey } from "@/lib/rules";
 import { Badge, Card, statusTone } from "@/components/ui";
 import { ApplyForm } from "./ApplyForm";
 
@@ -34,7 +34,7 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <article className="space-y-6">
         <div>
-          <Link href="/" className="text-sm">← All studies</Link>
+          <Link href="/studies" className="text-sm">← All studies</Link>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge tone={statusTone(study.status)}>{study.status === "RECRUITING" ? "Recruiting" : "Closed"}</Badge>
             <Badge>{PHASE_LABELS[study.phase] ?? study.phase}</Badge>
@@ -113,11 +113,15 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
           ) : existing ? (
             <div className="mt-2 space-y-2">
               <p>
-                You applied on {formatDate(existing.submittedAt)}. Status:{" "}
+                You applied on {formatDay(existing.submittedAt)}. Status:{" "}
                 <Badge tone={statusTone(existing.status)}>{existing.status.toLowerCase()}</Badge>
               </p>
               <Link href="/student">Go to my dashboard →</Link>
             </div>
+          ) : !user.emailVerifiedAt ? (
+            <p className="mt-2 text-slate-600">
+              Confirm your email address to apply. <Link href="/verify-email">Resend the confirmation link</Link>.
+            </p>
           ) : !study.consentForm ? (
             <p className="mt-2 text-slate-600">This study isn&apos;t accepting applications yet.</p>
           ) : (
@@ -129,6 +133,7 @@ export default async function StudyPage({ params }: { params: Promise<{ id: stri
               consentText={study.consentForm.text}
               consentVersion={study.consentForm.version}
               consentUrl={study.consentForm.fileUrl}
+              today={zonedDateKey(new Date())}
             />
           )}
         </Card>

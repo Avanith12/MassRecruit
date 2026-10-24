@@ -1,0 +1,6 @@
+{
+  "name": "E2E before push",
+  "description": "Run the Playwright browser suite against a production build before pushing, to catch regressions in the full recruitment flow.",
+  "trigger": { "type": "beforeGitPush" },
+  "action": { "type": "runCommand", "command": "npm run test:e2e" }
+}

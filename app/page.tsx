@@ -1,120 +1,48 @@
 import Link from "next/link";
-import { searchStudies } from "@/lib/services";
-import { PHASES, PHASE_LABELS } from "@/lib/rules";
-import { Badge, statusTone } from "@/components/ui";
+import { db } from "@/lib/db";
+import { publicStudyWhere } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
-type SP = Promise<Record<string, string | string[] | undefined>>;
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
-
-export default async function Home({ searchParams }: { searchParams: SP }) {
-  const sp = await searchParams;
-  const q = one(sp.q).slice(0, 100);
-  const phase = one(sp.phase);
-  const status = one(sp.status);
-  const page = Math.max(1, Number.parseInt(one(sp.page), 10) || 1);
-  const error = one(sp.error);
-  const { studies, total, pageCount } = await searchStudies({ q, phase, status, page });
-
-  const pageHref = (p: number) => {
-    const u = new URLSearchParams();
-    if (q) u.set("q", q);
-    if (phase) u.set("phase", phase);
-    if (status) u.set("status", status);
-    if (p > 1) u.set("page", String(p));
-    const s = u.toString();
-    return s ? `/?${s}` : "/";
-  };
+export default async function Landing({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
+  const { denied } = await searchParams;
+  const [recruiting, schools] = await Promise.all([
+    db.study.count({ where: { ...publicStudyWhere, status: "RECRUITING" } }),
+    db.school.count(),
+  ]);
 
   return (
-    <div className="space-y-6">
-      {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
+    <section className="landing mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center text-center">
+      {denied === "1" && (
+        <p role="alert" className="mb-6 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+          You don&apos;t have access to that page.
         </p>
       )}
-      <section className="rounded-xl bg-gradient-to-br from-brand-700 to-brand-600 px-6 py-10 text-white">
-        <h1 className="text-3xl font-bold">Find research studies across Massachusetts</h1>
-        <p className="mt-2 max-w-2xl text-brand-50">
-          Compare compensation, see exactly how your data is used, and sign up in minutes — no account needed to browse.
-        </p>
-      </section>
+      {/* Decorative logo mark */}
+      <svg aria-hidden="true" viewBox="0 0 64 64" className="landing-icon h-20 w-20 text-brand-600">
+        <rect width="64" height="64" rx="16" fill="currentColor" />
+        <path d="M18 44V22l14 13 14-13v22" fill="none" stroke="var(--icon-fg, #fff)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
 
-      <form role="search" method="get" action="/" className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_auto_auto_auto]">
-        <label className="sr-only" htmlFor="q">Search studies</label>
-        <input
-          id="q"
-          name="q"
-          defaultValue={q}
-          placeholder="Search by name, condition, or city"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-        />
-        <label className="sr-only" htmlFor="phase">Phase</label>
-        <select id="phase" name="phase" defaultValue={phase} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
-          <option value="">All phases</option>
-          {PHASES.map((p) => (
-            <option key={p} value={p}>{PHASE_LABELS[p]}</option>
-          ))}
-        </select>
-        <label className="sr-only" htmlFor="status">Status</label>
-        <select id="status" name="status" defaultValue={status} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
-          <option value="">Any status</option>
-          <option value="RECRUITING">Recruiting</option>
-          <option value="CLOSED">Closed</option>
-        </select>
-        <button type="submit" className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
-          Search
-        </button>
-      </form>
-
-      <p className="text-sm text-slate-600" aria-live="polite" data-testid="result-count">
-        {total} {total === 1 ? "study" : "studies"} found
+      <h1 className="mt-6 text-5xl font-extrabold tracking-tight text-slate-900 sm:text-7xl">MassRecruit</h1>
+      <p className="landing-tagline mt-4 text-2xl font-semibold text-brand-600 sm:text-3xl">
+        Your campus. Real research. Real rewards.
+      </p>
+      <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-600">
+        One place to discover research studies across Massachusetts universities. See exactly what you&apos;ll earn
+        and how your data is used, sign the consent form online, and book a time slot in minutes.
       </p>
 
-      {studies.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 p-10 text-center text-slate-500">
-          No studies match your search. Try a different keyword or clear the filters.
-        </p>
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {studies.map((s) => (
-            <li key={s.id}>
-              <Link
-                href={`/studies/${s.id}`}
-                data-testid="study-card"
-                className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-5 text-slate-900 no-underline shadow-sm transition hover:border-brand-600 hover:no-underline hover:shadow-md"
-              >
-                <div className="flex items-center gap-2">
-                  <Badge tone={statusTone(s.status)}>{s.status === "RECRUITING" ? "Recruiting" : "Closed"}</Badge>
-                  <Badge>{PHASE_LABELS[s.phase] ?? s.phase}</Badge>
-                </div>
-                <h2 className="mt-3 font-semibold leading-snug">{s.name}</h2>
-                <dl className="mt-auto pt-4 text-sm">
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">Compensation</dt>
-                    <dd className="font-medium text-green-800">{s.compensationDetails}</dd>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-slate-500">City</dt>
-                    <dd className="font-medium">{s.city}</dd>
-                  </div>
-                </dl>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <p className="mt-6 text-sm text-slate-500" data-testid="landing-stats">
+        {recruiting} studies recruiting now · {schools} universities
+      </p>
 
-      {pageCount > 1 && (
-        <nav aria-label="Pagination" className="flex items-center justify-center gap-4 text-sm">
-          {page > 1 ? <Link href={pageHref(page - 1)}>← Previous</Link> : <span className="text-slate-400">← Previous</span>}
-          <span>
-            Page {Math.min(page, pageCount)} of {pageCount}
-          </span>
-          {page < pageCount ? <Link href={pageHref(page + 1)}>Next →</Link> : <span className="text-slate-400">Next →</span>}
-        </nav>
-      )}
-    </div>
+      <Link
+        href="/studies"
+        className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-600 px-8 py-4 text-lg font-semibold text-white no-underline shadow-md transition hover:bg-brand-700 hover:no-underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/40"
+      >
+        Continue <span aria-hidden="true">→</span>
+      </Link>
+    </section>
   );
 }

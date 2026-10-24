@@ -1,8 +1,16 @@
 /* Seeds the eight normalized tables from data/massrecruit_mock_data.csv and adds
- * demo accounts. Idempotent: wipes existing rows first.
+ * demo accounts. Idempotent: WIPES existing rows first.
  *
- * All seeded accounts use the password in SEED_PASSWORD (default "password123").
+ * Passwords:
+ *  - Demo accounts (admin / student / researcher / pending) use SEED_PASSWORD.
+ *    "password123" is only allowed for a local database.
+ *  - The ~400 CSV mock users get a random, never-revealed password (they can't sign in),
+ *    so a hosted demo has no accounts with a publicly known password except the four
+ *    demo logins you choose a password for.
+ *
+ * Against a non-local database you must also set SEED_CONFIRM=yes (this deletes data).
  */
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import bcrypt from "bcryptjs";
@@ -11,7 +19,27 @@ import { parseCsvObjects } from "../lib/csv";
 import { PHASES, isOneOf, parseMinAge, zonedWallTimeToUtc } from "../lib/rules";
 
 const db = new PrismaClient();
-const PASSWORD = process.env.SEED_PASSWORD || "password123";
+
+function dbIsLocal(): boolean {
+  try {
+    const host = new URL(process.env.DATABASE_URL ?? "").hostname;
+    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(host);
+  } catch {
+    return false;
+  }
+}
+const LOCAL = dbIsLocal();
+const PASSWORD = process.env.SEED_PASSWORD || (LOCAL ? "password123" : "");
+if (!LOCAL) {
+  if (process.env.SEED_CONFIRM !== "yes") {
+    console.error("Refusing to seed a non-local database: this DELETES all data. Re-run with SEED_CONFIRM=yes.");
+    process.exit(1);
+  }
+  if (PASSWORD.length < 12) {
+    console.error("Set SEED_PASSWORD (12+ characters) for the demo accounts when seeding a hosted database.");
+    process.exit(1);
+  }
+}
 
 const at = (s: string) => {
   const d = s ? zonedWallTimeToUtc(s) : null;
@@ -41,12 +69,35 @@ const uniqEmail = (seen: Set<string>, email: string) => {
   return v;
 };
 
+/** Common short names so students can search "UMass Boston", "MIT", "BU", etc. */
+const SCHOOL_ALIASES: Record<string, string> = {
+  "University of Massachusetts Boston": "UMass Boston, UMB",
+  "University of Massachusetts Amherst": "UMass Amherst",
+  "University of Massachusetts Lowell": "UMass Lowell, UML",
+  "University of Massachusetts Dartmouth": "UMass Dartmouth, UMassD",
+  "UMass Chan Medical School": "UMass Medical, UMass Worcester, UMMS",
+  "Massachusetts Institute of Technology": "MIT",
+  "Boston University": "BU",
+  "Boston College": "BC",
+  "Northeastern University": "NEU, Northeastern",
+  "Worcester Polytechnic Institute": "WPI",
+  "College of the Holy Cross": "Holy Cross",
+  "Harvard University": "Harvard",
+  "Tufts University": "Tufts",
+  "Brandeis University": "Brandeis",
+  "Clark University": "Clark",
+  "Simmons University": "Simmons",
+};
+
 async function main() {
   const rows = parseCsvObjects(readFileSync(join(__dirname, "..", "data", "massrecruit_mock_data.csv"), "utf8"));
   console.log(`Parsed ${rows.length} CSV rows`);
-  const passwordHash = await bcrypt.hash(PASSWORD, 10);
+  const passwordHash = await bcrypt.hash(PASSWORD, 10); // demo accounts
+  const mockHash = await bcrypt.hash(randomBytes(32).toString("hex"), 10); // CSV users: unusable
 
   // Wipe in FK order.
+  await db.rateLimit.deleteMany();
+  await db.emailLog.deleteMany();
   await db.booking.deleteMany();
   await db.application.deleteMany();
   await db.availabilitySlot.deleteMany();
@@ -64,7 +115,9 @@ async function main() {
 
   for (const r of rows) {
     if (!schoolIds.has(r.school_id)) {
-      const s = await db.school.create({ data: { name: r.school_name, emailDomain: r.school_email_domain, city: r.school_city } });
+      const s = await db.school.create({
+        data: { name: r.school_name, emailDomain: r.school_email_domain, city: r.school_city, aliases: SCHOOL_ALIASES[r.school_name] ?? "" },
+      });
       schoolIds.set(r.school_id, s.id);
     }
     if (!deptIds.has(r.department_id)) {
@@ -90,7 +143,7 @@ async function main() {
     emails.add(email);
     return db.user.create({
       data: {
-        username, name, email, role, verified, passwordHash,
+        username, name, email, role, verified, passwordHash, emailVerifiedAt: new Date(),
         ...(withSchool ? { schoolId: umb.id, departmentId: umbDept.id, phone: "(617) 555-0100" } : {}),
       },
     });
@@ -113,7 +166,8 @@ async function main() {
           role: "RESEARCHER",
           verified: r.researcher_verified === "true",
           phone: r.researcher_phone || null,
-          passwordHash,
+          passwordHash: mockHash,
+          emailVerifiedAt: new Date(),
           schoolId: schoolIds.get(r.school_id),
           departmentId: deptIds.get(r.department_id),
         },
@@ -140,7 +194,8 @@ async function main() {
         createdAt: at(r.study_created_at)!,
         consentForm: {
           create: {
-            fileUrl: r.consent_file_url || null,
+            // CSV URLs point at a placeholder domain that doesn't exist; keep the text consent only.
+            fileUrl: null,
             version: Number(r.consent_version) || 1,
             text: consentText(r.study_name, r.school_name),
             createdAt: at(r.consent_created_at) ?? undefined,
@@ -168,7 +223,8 @@ async function main() {
             email: uniqEmail(emails, r.participant_email),
             name: r.participant_name,
             role: "STUDENT",
-            passwordHash,
+            passwordHash: mockHash,
+            emailVerifiedAt: new Date(),
           },
         });
         participantId = u.id;
@@ -227,7 +283,9 @@ async function main() {
     `Seeded: ${schoolIds.size} schools, ${await db.department.count()} departments, ${await db.user.count()} users, ` +
       `${studies} studies, ${slots} slots, ${apps} applications, ${bookings} bookings`,
   );
-  console.log(`Demo logins (password "${PASSWORD}"): admin / student / researcher (verified) / pending (unverified researcher)`);
+  console.log(
+    `Demo logins: admin / student / researcher (verified) / pending (unverified researcher) — password ${LOCAL ? `"${PASSWORD}"` : "from SEED_PASSWORD"}`,
+  );
   void admin; void student;
 }
 

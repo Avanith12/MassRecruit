@@ -1,5 +1,6 @@
 // MassRecruit data model — eight entities (see README "Data model").
-// SQLite in dev; swap provider/url for Turso or Postgres in production.
+// PostgreSQL everywhere: embedded Postgres locally (npm run db:start), Neon /
+// Vercel Postgres / any managed Postgres in production.
 // String columns are used instead of enums for portability; allowed values are
 // enforced in lib/rules.ts.
 
@@ -8,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -17,6 +18,7 @@ model School {
   name        String       @unique
   emailDomain String
   city        String
+  aliases     String       @default("") // comma-separated short names for search, e.g. "UMass Boston, UMB"
   departments Department[]
   users       User[]
 }
@@ -32,21 +34,29 @@ model Department {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  username     String       @unique
-  passwordHash String
-  name         String
-  email        String       @unique
-  role         String // STUDENT | RESEARCHER | ADMIN
-  verified     Boolean      @default(false) // researchers need admin approval
-  phone        String?
-  schoolId     String?
-  school       School?      @relation(fields: [schoolId], references: [id])
-  departmentId String?
-  department   Department?  @relation(fields: [departmentId], references: [id])
-  createdAt    DateTime     @default(now())
-  studies      Study[]
-  applications Application[]
+  id                String        @id @default(cuid())
+  username          String        @unique
+  passwordHash      String
+  name              String
+  email             String        @unique
+  role              String // STUDENT | RESEARCHER | ADMIN
+  verified          Boolean       @default(false) // researchers need admin approval
+  phone             String?
+  schoolId          String?
+  school            School?       @relation(fields: [schoolId], references: [id])
+  departmentId      String?
+  department        Department?   @relation(fields: [departmentId], references: [id])
+  failedLogins      Int           @default(0)
+  // Email ownership: set when the user clicks the link we email them.
+  emailVerifiedAt   DateTime?
+  emailTokenHash    String?       @unique // sha256 of the one-time verification token
+  emailTokenExpires DateTime?
+  // Bumped on sign-out; sessions carrying an older version are rejected.
+  sessionVersion    Int           @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime      @default(now())
+  studies           Study[]
+  applications      Application[]
 }
 
 model Study {
@@ -125,4 +135,24 @@ model Booking {
   application    Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   reminderSentAt DateTime?
   createdAt      DateTime         @default(now())
+}
+
+// Every outgoing email (sent, logged in dev, or failed) — viewable by admins.
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  text      String
+  status    String // SENT | DEV_LOGGED | FAILED
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Fixed-window rate limiter stored in the DB so it works across serverless instances.
+model RateLimit {
+  key         String   @id // e.g. "login:203.0.113.7"
+  count       Int
+  windowStart DateTime
 }

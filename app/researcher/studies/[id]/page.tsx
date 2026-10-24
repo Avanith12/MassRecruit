@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
-import { ageOn, formatDate, formatDateTime, zonedDateKey } from "@/lib/rules";
+import { ageOn, formatDateTime, zonedDateKey } from "@/lib/rules";
 import { ActionForm } from "@/components/ActionForm";
 import { Badge, Button, Card, Field, Input, statusTone } from "@/components/ui";
 import { addSlotAction, decideAction, deleteSlotAction, updateStudyAction } from "@/app/actions";
@@ -31,7 +31,7 @@ export default async function ManageStudyPage({
   });
   if (!study || study.researcherId !== me.id) notFound();
   const now = new Date();
-  const tomorrow = zonedDateKey(new Date(now.getTime() + 24 * 3600_000));
+  const today = zonedDateKey(now);
 
   return (
     <div className="space-y-6">
@@ -62,7 +62,7 @@ export default async function ManageStudyPage({
                       <p className="font-medium">{a.name}</p>
                       <p className="text-xs text-slate-600">
                         {a.email} · age {ageOn(a.dateOfBirth, now)} · signed &ldquo;{a.consentSignedName}&rdquo; (v{a.consentVersionSigned}) on{" "}
-                        {formatDate(a.consentSignedAt)}
+                        {formatDateTime(a.consentSignedAt)}
                       </p>
                       {a.booking && <p className="mt-1 text-xs">📅 {formatDateTime(a.booking.slot.startTime)}</p>}
                     </div>
@@ -92,7 +92,7 @@ export default async function ManageStudyPage({
           <h2 className="text-lg font-semibold">Availability slots</h2>
           <p className="text-xs text-slate-500">Times are Eastern (Boston).</p>
           <ActionForm action={addSlotAction.bind(null, study.id)} className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end" aria-label="Add slot" resetOnSuccess>
-            <Field label="Date"><Input name="date" type="date" required min={tomorrow} /></Field>
+            <Field label="Date"><Input name="date" type="date" required min={today} /></Field>
             <Field label="Start"><Input name="start" type="time" required /></Field>
             <Field label="End"><Input name="end" type="time" required /></Field>
             <Button>Add</Button>
@@ -124,7 +124,7 @@ export default async function ManageStudyPage({
         <StudyForm
           action={updateStudyAction.bind(null, study.id)}
           submitLabel="Save changes"
-          defaults={{ ...study, consentText: study.consentForm?.text ?? "", consentVersion: study.consentForm?.version }}
+          defaults={{ ...study, consentText: study.consentForm?.text ?? "", consentVersion: study.consentForm?.version, consentPdfUrl: study.consentForm?.fileUrl }}
         />
       </Card>
     </div>

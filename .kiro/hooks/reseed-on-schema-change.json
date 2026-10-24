@@ -1,0 +1,9 @@
+{
+  "name": "Reseed after schema change",
+  "description": "After a Prisma schema change, regenerate the client, apply a dev migration, and reseed the local database so the running app matches the new schema.",
+  "trigger": { "type": "fileSaved", "patterns": ["prisma/schema.prisma"] },
+  "action": {
+    "type": "runCommand",
+    "command": "npx prisma generate && npx prisma migrate dev && npx prisma db seed"
+  }
+}

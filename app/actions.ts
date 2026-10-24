@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { ActionState } from "@/components/ActionForm";
-import { createSession, destroySession, getCurrentUser, homeFor, type CurrentUser } from "@/lib/session";
+import { clientIp, createSession, destroySession, getCurrentUser, homeFor, type CurrentUser } from "@/lib/session";
 import { parseDateOnly, zonedWallTimeToUtc } from "@/lib/rules";
 import * as svc from "@/lib/services";
 
@@ -38,18 +38,22 @@ function safeNext(next: string): string | null {
 
 export async function loginAction(_: ActionState, fd: FormData): Promise<ActionState> {
   let user: Awaited<ReturnType<typeof svc.authenticate>> | undefined;
+  const ip = await clientIp();
   const res = await attempt(async () => {
+    await svc.enforceRateLimit("login", ip);
     user = await svc.authenticate(str(fd, "username"), str(fd, "password"), str(fd, "role"));
   });
   if (res?.error || !user) return res;
-  await createSession(user.id);
+  await createSession(user);
   redirect(safeNext(str(fd, "next")) ?? homeFor(user.role));
 }
 
 export async function registerAction(_: ActionState, fd: FormData): Promise<ActionState> {
   if (str(fd, "password") !== str(fd, "confirm")) return { error: "Passwords do not match." };
   let user: Awaited<ReturnType<typeof svc.registerUser>> | undefined;
+  const ip = await clientIp();
   const res = await attempt(async () => {
+    await svc.enforceRateLimit("register", ip);
     user = await svc.registerUser({
       role: str(fd, "role"),
       username: str(fd, "username"),
@@ -62,7 +66,7 @@ export async function registerAction(_: ActionState, fd: FormData): Promise<Acti
     });
   });
   if (res?.error || !user) return res;
-  await createSession(user.id);
+  await createSession(user);
   redirect(homeFor(user.role));
 }
 
@@ -75,15 +79,15 @@ export async function logoutAction() {
 
 export async function applyAction(studyId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   const me = await actor();
-  const res = await attempt(() =>
-    svc.applyToStudy(me, studyId, {
+  const res = await attempt(async () => {
+    await svc.enforceRateLimit("apply", me.id);
+    await svc.applyToStudy(me, studyId, {
       name: str(fd, "name"),
-      email: str(fd, "email"),
       dateOfBirth: parseDateOnly(str(fd, "dob")),
       consentChecked: fd.get("consent") === "on",
       signedName: str(fd, "signature"),
-    }),
-  );
+    });
+  });
   if (res?.error) return res;
   revalidatePath(`/studies/${studyId}`);
   redirect("/student?applied=1");
@@ -98,8 +102,12 @@ export async function bookAction(_: ActionState, fd: FormData): Promise<ActionSt
 
 // ---------------------------------------------------------------- researcher
 
-function studyInput(fd: FormData): svc.StudyInput {
+async function studyInput(fd: FormData): Promise<svc.StudyInput> {
+  const file = fd.get("consentPdf");
+  const consentPdf = file instanceof File && file.size > 0 ? new Uint8Array(await file.arrayBuffer()) : null;
   return {
+    consentPdf,
+    removeConsentPdf: fd.get("removeConsentPdf") === "on",
     name: str(fd, "name"),
     condition: str(fd, "condition"),
     city: str(fd, "city"),
@@ -119,19 +127,20 @@ export async function createStudyAction(_: ActionState, fd: FormData): Promise<A
   const me = await actor();
   let id = "";
   const res = await attempt(async () => {
-    id = (await svc.createStudy(me, studyInput(fd))).id;
+    id = (await svc.createStudy(me, await studyInput(fd))).id;
   });
   if (res?.error) return res;
-  revalidatePath("/");
+  revalidatePath("/studies");
   redirect(`/researcher/studies/${id}?created=1`);
 }
 
 export async function updateStudyAction(studyId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   const me = await actor();
-  const res = await attempt(() => svc.updateStudy(me, studyId, studyInput(fd)), "Study saved.");
+  const input = await studyInput(fd);
+  const res = await attempt(() => svc.updateStudy(me, studyId, input), "Study saved.");
   revalidatePath(`/researcher/studies/${studyId}`);
   revalidatePath(`/studies/${studyId}`);
-  revalidatePath("/");
+  revalidatePath("/studies");
   return res;
 }
 
@@ -171,6 +180,26 @@ export async function verifyAction(_: ActionState, fd: FormData): Promise<Action
   const verified = str(fd, "verified") === "true";
   const res = await attempt(() => svc.setResearcherVerified(me, str(fd, "userId"), verified), verified ? "Researcher approved." : "Verification revoked.");
   revalidatePath("/admin");
-  revalidatePath("/");
+  revalidatePath("/studies");
   return res;
+}
+
+// ---------------------------------------------------------------- email verification
+
+export async function verifyEmailAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  let user: Awaited<ReturnType<typeof svc.verifyEmailToken>> | undefined;
+  const res = await attempt(async () => {
+    await svc.enforceRateLimit("verify", await clientIp());
+    user = await svc.verifyEmailToken(str(fd, "token"));
+  });
+  if (res?.error || !user) return res;
+  redirect(`${homeFor(user.role)}?verified=1`);
+}
+
+export async function resendVerificationAction(_: ActionState): Promise<ActionState> {
+  const me = await actor();
+  return attempt(async () => {
+    await svc.enforceRateLimit("resend", me.id);
+    await svc.sendVerificationEmail(me.id);
+  }, `We sent a new link to ${me.email}.`);
 }

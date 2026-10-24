@@ -51,7 +51,8 @@ export function validateUsername(u: string): string | null {
 
 export function validatePassword(p: string): string | null {
   if (p.length < 8) return "Password must be at least 8 characters.";
-  if (p.length > 128) return "Password must be at most 128 characters.";
+  // bcrypt only uses the first 72 bytes; reject longer so no part is silently ignored.
+  if (new TextEncoder().encode(p).length > 72) return "Password must be at most 72 bytes (about 72 characters).";
   return null;
 }
 
@@ -102,6 +103,41 @@ function normName(s: string): string {
 export function consentSignatureMatches(typed: string, name: string): boolean {
   const t = normName(typed);
   return t.length > 0 && t === normName(name);
+}
+
+// ---------- search ----------
+
+const STOPWORDS = new Set(["a", "an", "and", "at", "for", "in", "of", "the", "to"]);
+
+/** Trim, collapse whitespace, and drop SQL LIKE wildcards (Prisma doesn't escape them on SQLite). */
+export function normalizeQuery(q: string): string {
+  return q.replace(/[%_\\]/g, " ").trim().replace(/\s+/g, " ").slice(0, 100);
+}
+
+/** Significant search tokens (stopwords dropped unless that would leave nothing). */
+export function queryTokens(q: string): string[] {
+  const all = normalizeQuery(q).split(" ").filter(Boolean);
+  const sig = all.filter((t) => !STOPWORDS.has(t.toLowerCase()));
+  return sig.length ? sig : all;
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export type SchoolSearchFields = { name: string; aliases: string; emailDomain: string };
+
+/**
+ * True if `term` matches a school's name or one of its aliases at a word start
+ * (so "mit" matches "MIT" but not "Smith College"), or equals its email domain.
+ */
+export function schoolMatchesTerm(s: SchoolSearchFields, term: string): boolean {
+  const t = normalizeQuery(term).toLowerCase().replace(/^@/, "");
+  if (!t) return false;
+  if (t === s.emailDomain.toLowerCase()) return true;
+  const re = new RegExp(`(^|[^a-z0-9])${escapeRe(t)}`, "i");
+  return [s.name, ...s.aliases.split(",")]
+    .map((x) => x.trim().replace(/\s+/g, " "))
+    .filter(Boolean)
+    .some((h) => re.test(h));
 }
 
 // ---------- time zones ----------
@@ -165,8 +201,14 @@ export function formatDateTime(d: Date): string {
   });
 }
 
+/** Date-only values (e.g. date of birth, stored as UTC midnight). */
 export function formatDate(d: Date): string {
   return d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+}
+
+/** Calendar day of a timestamp, as seen in Boston. */
+export function formatDay(d: Date): string {
+  return d.toLocaleDateString("en-US", { timeZone: APP_TIME_ZONE, month: "short", day: "numeric", year: "numeric" });
 }
 
 // ---------- scheduling ----------

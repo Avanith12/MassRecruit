@@ -1,0 +1,9 @@
+{
+  "name": "Verify on save",
+  "description": "Typecheck + run the fast unit/property tests whenever a lib or test file is saved, so rule regressions surface immediately.",
+  "trigger": { "type": "fileSaved", "patterns": ["lib/**/*.ts", "tests/unit/**/*.ts", "prisma/schema.prisma"] },
+  "action": {
+    "type": "runCommand",
+    "command": "npm run typecheck && npx vitest run tests/unit/rules.test.ts"
+  }
+}

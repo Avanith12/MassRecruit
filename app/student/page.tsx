@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
-import { formatDate, formatDateTime } from "@/lib/rules";
+import { formatDay, formatDateTime } from "@/lib/rules";
 import { ActionForm } from "@/components/ActionForm";
 import { Badge, Button, Card, statusTone } from "@/components/ui";
 import { bookAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentDashboard({ searchParams }: { searchParams: Promise<{ applied?: string }> }) {
+export default async function StudentDashboard({ searchParams }: { searchParams: Promise<{ applied?: string; verified?: string }> }) {
   const me = await requireRole("STUDENT");
-  const { applied } = await searchParams;
+  const { applied, verified } = await searchParams;
   const now = new Date();
   const apps = await db.application.findMany({
     where: { participantId: me.id },
@@ -20,6 +20,7 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
       study: {
         select: {
           id: true, name: true, city: true, compensationDetails: true,
+          researcher: { select: { verified: true } },
           slots: { where: { isBooked: false, startTime: { gt: now } }, orderBy: { startTime: "asc" }, take: 50 },
         },
       },
@@ -32,6 +33,11 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
         <h1 className="text-2xl font-bold">Hi, {me.name.split(" ")[0]}</h1>
         <p className="text-slate-600">Your study applications and appointments.</p>
       </div>
+      {verified && (
+        <p role="status" className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
+          Email confirmed — you can now apply to studies.
+        </p>
+      )}
       {applied && (
         <p role="status" className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">
           Application submitted! The research team will review it and you&apos;ll get an email when they decide.
@@ -41,7 +47,7 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
       {apps.length === 0 ? (
         <Card>
           <p>You haven&apos;t applied to any studies yet.</p>
-          <Link href="/" className="mt-2 inline-block">Browse studies →</Link>
+          <Link href="/studies" className="mt-2 inline-block">Browse studies →</Link>
         </Card>
       ) : (
         <ul className="space-y-4">
@@ -52,7 +58,7 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
                   <div>
                     <Link href={`/studies/${a.study.id}`} className="font-semibold">{a.study.name}</Link>
                     <p className="text-sm text-slate-600">
-                      {a.study.city} · {a.study.compensationDetails} · applied {formatDate(a.submittedAt)} · consent v{a.consentVersionSigned}
+                      {a.study.city} · {a.study.compensationDetails} · applied {formatDay(a.submittedAt)} · consent v{a.consentVersionSigned}
                     </p>
                   </div>
                   <Badge tone={statusTone(a.status)}>{a.status.toLowerCase()}</Badge>
@@ -65,7 +71,11 @@ export default async function StudentDashboard({ searchParams }: { searchParams:
                   </p>
                 )}
 
-                {a.status === "ACCEPTED" && !a.booking && (
+                {a.status === "ACCEPTED" && !a.booking && !a.study.researcher.verified && (
+                  <p className="mt-3 text-sm text-slate-600">This study is temporarily unavailable for booking.</p>
+                )}
+
+                {a.status === "ACCEPTED" && !a.booking && a.study.researcher.verified && (
                   <div className="mt-3">
                     {a.study.slots.length === 0 ? (
                       <p className="text-sm text-slate-600">You&apos;re accepted! No open time slots yet — check back soon.</p>
